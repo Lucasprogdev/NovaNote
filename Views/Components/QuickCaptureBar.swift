@@ -25,14 +25,12 @@ struct QuickCaptureBar: View {
 
     var body: some View {
         GlassEffectContainer(spacing: Constants.Spacing.md) {
-            Group {
-                if isExpanded {
-                    expandedBar
-                        .glassEffectID("quickCapture", in: namespace)
-                } else {
-                    collapsedButton
-                        .glassEffectID("quickCapture", in: namespace)
-                }
+            if isExpanded {
+                expandedBar
+                    .glassEffectID("quickCapture", in: namespace)
+            } else {
+                collapsedButton
+                    .glassEffectID("quickCapture", in: namespace)
             }
         }
         .animation(animation, value: isExpanded)
