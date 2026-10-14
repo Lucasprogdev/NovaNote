@@ -23,6 +23,8 @@ struct NoteEditorView: View {
     @FocusState private var isTitleFocused: Bool
     @FocusState private var isContentFocused: Bool
 
+    @State private var showDeleteConfirmation = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -60,6 +62,43 @@ struct NoteEditorView: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Constants.Colors.accent)
                 }
+
+                if note != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button {
+                                note?.isFavorite.toggle()
+                                try? modelContext.save()
+                            } label: {
+                                Label(
+                                    (note?.isFavorite ?? false) ? "Retirer des favoris" : "Ajouter aux favoris",
+                                    systemImage: (note?.isFavorite ?? false) ? "star.slash" : "star"
+                                )
+                            }
+
+                            Button {
+                                note?.isArchived.toggle()
+                                try? modelContext.save()
+                            } label: {
+                                Label(
+                                    (note?.isArchived ?? false) ? "Désarchiver" : "Archiver",
+                                    systemImage: (note?.isArchived ?? false) ? "archivebox" : "archivebox.fill"
+                                )
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Supprimer", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .foregroundStyle(Constants.Colors.textSecondary)
+                    }
+                }
             }
             .onAppear(perform: loadNote)
             .sheet(isPresented: $showFolderPicker) {
@@ -70,6 +109,18 @@ struct NoteEditorView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .confirmationDialog(
+            "Supprimer cette note ?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) {
+                deleteNote()
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Cette action est définitive.")
+        }
     }
 
     // MARK: - Champs
@@ -371,6 +422,13 @@ struct NoteEditorView: View {
         case .checklist:
             content += content.isEmpty ? "- [ ] Tâche" : "\n- [ ] Tâche"
         }
+    }
+
+    private func deleteNote() {
+        guard let note else { return }
+        modelContext.delete(note)
+        try? modelContext.save()
+        dismiss()
     }
 
     private func saveNote() {

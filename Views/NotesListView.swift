@@ -11,6 +11,8 @@ struct NotesListView: View {
 
     @Environment(\.modelContext) private var modelContext
 
+    @State private var noteToDelete: Note?
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -56,6 +58,16 @@ struct NotesListView: View {
             }
             .navigationTitle("Notes")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        noteViewModel.isCreatingNote = true
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .foregroundStyle(Constants.Colors.accent)
+                    .accessibilityLabel("Nouvelle note")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     if noteViewModel.hasActiveFilters {
                         Button("Effacer") {
@@ -93,6 +105,33 @@ struct NotesListView: View {
                     try? modelContext.save()
                 }
             )
+        }
+        .confirmationDialog(
+            "Supprimer cette note ?",
+            isPresented: Binding(
+                get: { noteToDelete != nil },
+                set: { if !$0 { noteToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) {
+                if let note = noteToDelete {
+                    noteViewModel.delete(note, in: modelContext)
+                }
+                noteToDelete = nil
+            }
+            Button("Annuler", role: .cancel) {
+                noteToDelete = nil
+            }
+        } message: {
+            Text("Cette action est définitive.")
+        }
+        .sheet(isPresented: $noteViewModel.isQuickCapturing) {
+            QuickCaptureSheet { text in
+                let newNote = Note(title: "", content: text)
+                modelContext.insert(newNote)
+                try? modelContext.save()
+            }
         }
     }
 
@@ -243,6 +282,41 @@ struct NotesListView: View {
             NoteRowView(note: note)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                noteViewModel.editingNote = note
+            } label: {
+                Label("Modifier", systemImage: "pencil")
+            }
+
+            Button {
+                note.isFavorite.toggle()
+                try? modelContext.save()
+            } label: {
+                Label(
+                    note.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris",
+                    systemImage: note.isFavorite ? "star.slash" : "star"
+                )
+            }
+
+            Button {
+                note.isArchived.toggle()
+                try? modelContext.save()
+            } label: {
+                Label(
+                    note.isArchived ? "Désarchiver" : "Archiver",
+                    systemImage: note.isArchived ? "tray.and.arrow.up" : "archivebox"
+                )
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                noteToDelete = note
+            } label: {
+                Label("Supprimer", systemImage: "trash")
+            }
+        }
     }
 
     private func sectionHeader(icon: String, title: String, tint: Color) -> some View {

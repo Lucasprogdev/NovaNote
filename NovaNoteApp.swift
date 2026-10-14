@@ -7,6 +7,6 @@ struct NovaNoteApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [Note.self, Folder.self, Tag.self])
+        .modelContainer(NovaNoteData.shared)
     }
 }

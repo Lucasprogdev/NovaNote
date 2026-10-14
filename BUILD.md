@@ -229,3 +229,54 @@ git add .
 git commit -m "Description du changement"
 git push
 ```
+
+---
+
+## 9. Raccourcis (app Raccourcis + Siri)
+
+NovaNote expose désormais des actions à l'application **Raccourcis**.
+
+> ⚠️ Lancez l'application **au moins une fois** après l'installation : ses
+> actions apparaissent ensuite dans l'app Raccourcis.
+
+### 9.1 Créer un raccourci « Note rapide » (sans ouvrir l'app)
+
+1. App **Raccourcis** → **+** (nouveau raccourci)
+2. Ajoutez **Demander une entrée** (texte) — vous pouvez dicter.
+3. Ajoutez l'action **NovaNote → Créer une note rapide**.
+4. Faites glisser la variable de l'entrée dans le champ « Texte de la note ».
+5. Nommez le raccourci (ex. « Note rapide ») et enregistrez.
+
+Résultat : le raccourci enregistre la note **instantanément**, sans ouvrir
+l'application.
+
+Astuce : vous pouvez aussi dire **« Dis Siri : Note rapide dans NovaNote »**.
+
+### 9.2 Créer un raccourci qui ouvre la page de capture rapide
+
+Trois méthodes possibles :
+
+- Action **NovaNote → Ouvrir la capture rapide**, **ou**
+- Action **Ouvrir des URL** avec `novanote://capture`, **ou**
+- Action Siri « Capture rapide NovaNote ».
+
+L'application s'ouvre directement sur une feuille de **capture rapide** : le
+clavier est déjà actif, vous tapez et vous appuyez sur **Enregistrer**.
+
+### 9.3 Utiliser un raccourci depuis l'écran d'accueil
+
+Raccourci → bouton **ⓘ** → **Ajouter à l'écran d'accueil**. Vous obtenez une
+icône qui enregistre une note en un tap (ou dicte une note en un tap).
+
+---
+
+## 10. Historique des corrections
+
+| Version | Correction |
+|---------|------------|
+| 1.0.1 | Bouton « + » de création de note fiabilisé (verre appliqué au bouton, hors du label) + bouton dossier dans la barre de navigation. |
+| 1.0.1 | **Suppression** des notes (appui long → Supprimer, ou menu ⋯ dans l'éditeur) et des dossiers (appui long → Supprimer), avec confirmation. |
+| 1.0.1 | **Renommage des dossiers** (appui long → Renommer). |
+| 1.0.1 | **Gestion des tags** : création et suppression depuis l'onglet Dossiers. |
+| 1.0.1 | Intégration **Raccourcis / Siri** + lien profond `novanote://capture`. |
+

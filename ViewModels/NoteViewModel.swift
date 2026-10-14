@@ -9,6 +9,7 @@ final class NoteViewModel: ObservableObject {
     @Published var selectedTag: Tag?
     @Published var isCreatingNote: Bool = false
     @Published var editingNote: Note?
+    @Published var isQuickCapturing: Bool = false
 
     /// Indique si un filtre (recherche, dossier, tag) est actif.
     var hasActiveFilters: Bool {
@@ -44,6 +45,15 @@ final class NoteViewModel: ObservableObject {
         })
     }
     
+    /// Supprime définitivement une note.
+    func delete(_ note: Note, in context: ModelContext) {
+        if editingNote?.id == note.id {
+            editingNote = nil
+        }
+        context.delete(note)
+        try? context.save()
+    }
+
     func pinnedNotes(_ notes: [Note]) -> [Note] {
         notes.filter { $0.isPinned && !$0.isArchived }
             .sorted(by: { $0.modifiedAt > $1.modifiedAt })

@@ -47,6 +47,7 @@ targets:
       - path: Views
       - path: Extensions
       - path: Utilities
+      - path: Intents
       - path: Resources
         excludes:
           - "Info.plist"

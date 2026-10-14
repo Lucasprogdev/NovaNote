@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Bouton flottant réutilisable basé sur le langage visuel Liquid Glass d'Apple.
+/// Bouton circulaire en Liquid Glass.
 ///
-/// Le verre est réservé à la couche de navigation / aux actions flottantes.
-/// Le contenu (listes, éditeurs) ne doit jamais recevoir d'effet de verre.
+/// ⚠️ L'effet de verre est appliqué **au `Button`** (et non à son label) et la
+/// zone tactile est explicitement définie avec `.contentShape(Circle())`.
+/// Appliquer `.glassEffect` *à l'intérieur* du label peut réduire la zone
+/// tactile et provoquer des taps « perdus » (il faut appuyer plusieurs fois).
 struct LiquidGlassButton: View {
-    let icon: String
+    var icon: String
     var size: CGFloat = 56
     var glass: Glass = .clear
-    let action: () -> Void
-
-    @State private var isPressed = false
+    var action: () -> Void
 
     var body: some View {
         Button(action: action) {
@@ -18,18 +18,21 @@ struct LiquidGlassButton: View {
                 .font(.system(size: size * 0.36, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
-                .glassEffect(glass.interactive(), in: Circle())
+                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.94 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isPressed)
-        .onLongPressGesture(
-            minimumDuration: .infinity,
-            maximumDistance: .infinity,
-            pressing: { pressing in
-                isPressed = pressing
-            },
-            perform: {}
-        )
+        .buttonStyle(GlassPressButtonStyle())
+        .glassEffect(glass.interactive(), in: Circle())
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Style de bouton avec un léger effet d'enfoncement, sans utiliser
+/// `onLongPressGesture` (qui entre en conflit avec le tap du `Button`).
+struct GlassPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.85), value: configuration.isPressed)
     }
 }
