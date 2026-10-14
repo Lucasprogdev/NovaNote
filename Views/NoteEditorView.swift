@@ -187,6 +187,12 @@ struct NoteEditorView: View {
         .buttonStyle(.plain)
     }
 
+    private var toolbarDivider: some View {
+        Divider()
+            .frame(height: 24)
+            .overlay(Color.white.opacity(0.2))
+    }
+
     private func formatButton(icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
@@ -199,6 +205,32 @@ struct NoteEditorView: View {
     }
 
     // MARK: - Sélecteurs
+
+    private func pickerRow(
+        title: String,
+        color: Color,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack {
+                Circle()
+                    .fill(color)
+                    .frame(width: 10, height: 10)
+                Text(title)
+                    .foregroundStyle(Constants.Colors.textPrimary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Constants.Colors.accent)
+                }
+            }
+            .padding(Constants.Spacing.lg)
+            .background(Constants.Colors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Constants.Radius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
 
     private var folderPickerSheet: some View {
         NavigationStack {

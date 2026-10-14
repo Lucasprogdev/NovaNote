@@ -209,3 +209,27 @@ jobs:
           name: NovaNote-unsigned-ipa
           path: NovaNote-unsigned.ipa
           if-no-files-found: error
+
+      # ---------------------------------------------------------------
+      # Diagnostic en cas d'échec : publie les erreurs en annotations
+      # lisibles via l'API publique (aucun accès aux logs requis).
+      # ---------------------------------------------------------------
+      - name: Report build failure (diagnostic)
+        if: failure()
+        run: |
+          set +e
+          LOG="$RUNNER_TEMP/xcodebuild.log"
+          {
+            echo "=== erreurs ==="
+            if [ -f "$LOG" ]; then
+              grep -nE 'error:|error :|BUILD FAILED|does not contain a scheme|Unable to find|is not supported|deployment target' "$LOG" | head -n 40
+            else
+              echo "(pas de log xcodebuild)"
+            fi
+            echo "=== fin du log ==="
+            if [ -f "$LOG" ]; then tail -n 60 "$LOG"; fi
+          } > "$RUNNER_TEMP/diag.txt" 2>&1
+          head -c 3000 "$RUNNER_TEMP/diag.txt"
+          B64=$(base64 < "$RUNNER_TEMP/diag.txt" | tr -d '\n' | head -c 6000)
+          echo "::notice title=DIAGNOSTIC_B64::${B64}"
+          exit 0
