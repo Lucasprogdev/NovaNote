@@ -37,7 +37,12 @@ jobs:
           xcode-version: latest-stable
 
       - name: Show available SDKs
-        run: xcodebuild -showsdks
+        run: |
+          set -uo pipefail
+          XCODEV=$(xcodebuild -version 2>&1 | tr '\n' ' ' || true)
+          SDKS=$(xcodebuild -showsdks 2>&1 | tr '\n' '|' | cut -c1-1500 || true)
+          echo "::notice title=TOOLCHAIN::${XCODEV} SDKS=${SDKS}"
+          xcodebuild -showsdks
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -59,6 +64,7 @@ jobs:
           fi
           echo "iOS SDK detected: $SDK_RAW"
           echo "Using IPHONEOS_DEPLOYMENT_TARGET: $TARGET"
+          echo "::notice title=DEPLOYMENT_TARGET::sdk_detected=${SDK_RAW} chosen=${TARGET}"
           echo "value=$TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Generate Xcode project
@@ -70,7 +76,8 @@ jobs:
       - name: Build (unsigned)
         if: ${{ github.event.inputs.signed != 'true' }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          LOG="$RUNNER_TEMP/xcodebuild.log"
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
@@ -82,7 +89,15 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            build 2>&1 | tee "$LOG"
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            ERR=$(grep -E 'error:|error :|BUILD FAILED|The following build commands failed|is not supported|deployment target|does not contain a scheme|Unable to find' "$LOG" | head -n 15 | tr '\n' '~' | cut -c1-1600 || true)
+            echo "::error title=BUILD_FAILED::status=${STATUS} :: ${ERR}"
+            echo "---- 40 dernières lignes du log ----"
+            tail -n 40 "$LOG"
+            exit "$STATUS"
+          fi
 
       - name: Package unsigned IPA
         if: ${{ github.event.inputs.signed != 'true' }}
