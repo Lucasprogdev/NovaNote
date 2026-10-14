@@ -52,17 +52,10 @@ jobs:
           OVERRIDE="${{ github.event.inputs.ios_target }}"
           if [ -n "$OVERRIDE" ]; then
             TARGET="$OVERRIDE"
+          elif [ "$SDK_RAW" = "0" ]; then
+            TARGET="$REQ"
           else
-            TARGET=$(python3 - "$SDK_RAW" "$REQ" <<'PY'
-import sys
-
-def key(v):
-    return tuple(int(x) for x in v.split('.') if x.isdigit())
-
-sdk, req = sys.argv[1], sys.argv[2]
-print(min([sdk, req], key=key))
-PY
-)
+            TARGET=$(printf '%s\n%s\n' "$SDK_RAW" "$REQ" | sort -t. -k1,1n -k2,2n | head -n1)
           fi
           echo "iOS SDK detected: $SDK_RAW"
           echo "Using IPHONEOS_DEPLOYMENT_TARGET: $TARGET"
