@@ -1,0 +1,25 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+*.xcarchive
+xcuserdata/
+*.xcuserstate
+
+# Artefacts de build / IPA
+Payload/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Signing
+*.p12
+*.mobileprovision
+certificate.p12
+
+# macOS
+.DS_Store
+
+# XcodeGen (fichier généré)
+NovaNote.xcodeproj/project.pbxproj

@@ -1,0 +1,203 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: "Générer un IPA signé (nécessite les secrets Apple)"
+        type: boolean
+        default: false
+      ios_target:
+        description: "Surcharger la cible iOS (ex: 26.0). Vide = 27.0 si le SDK le permet"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-latest
+
+    env:
+      PROJECT: NovaNote.xcodeproj
+      SCHEME: NovaNote
+      APP_NAME: NovaNote
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show available SDKs
+        run: xcodebuild -showsdks
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Determine iOS deployment target
+        id: target
+        run: |
+          set -uo pipefail
+          SDK_RAW=$(xcodebuild -showsdks | grep -oE 'iphoneos[0-9]+(\.[0-9]+)?' | head -n1 | sed 's/iphoneos//' || true)
+          SDK_RAW=${SDK_RAW:-0}
+          REQ="27.0"
+          OVERRIDE="${{ github.event.inputs.ios_target }}"
+          if [ -n "$OVERRIDE" ]; then
+            TARGET="$OVERRIDE"
+          else
+            TARGET=$(python3 - "$SDK_RAW" "$REQ" <<'PY'
+import sys
+
+def key(v):
+    return tuple(int(x) for x in v.split('.') if x.isdigit())
+
+sdk, req = sys.argv[1], sys.argv[2]
+print(min([sdk, req], key=key))
+PY
+)
+          fi
+          echo "iOS SDK detected: $SDK_RAW"
+          echo "Using IPHONEOS_DEPLOYMENT_TARGET: $TARGET"
+          echo "value=$TARGET" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # ---------------------------------------------------------------
+      # Build NON-SIGNÉ (par défaut, aucun compte Apple requis)
+      # ---------------------------------------------------------------
+      - name: Build (unsigned)
+        if: ${{ github.event.inputs.signed != 'true' }}
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            IPHONEOS_DEPLOYMENT_TARGET="${{ steps.target.outputs.value }}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        if: ${{ github.event.inputs.signed != 'true' }}
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release-iphoneos/$APP_NAME.app"
+          test -d "$APP" || { echo "App introuvable : $APP"; exit 1; }
+          rm -rf Payload NovaNote-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry NovaNote-unsigned.ipa Payload -x '.*'
+          ls -lh NovaNote-unsigned.ipa
+
+      # ---------------------------------------------------------------
+      # Build SIGNÉ (optionnel — nécessite les secrets Apple)
+      # ---------------------------------------------------------------
+      - name: Validate signing secrets
+        if: ${{ github.event.inputs.signed == 'true' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          : "${APPLE_CERTIFICATE:?secret APPLE_CERTIFICATE manquant}"
+          : "${APPLE_CERTIFICATE_PASSWORD:?secret APPLE_CERTIFICATE_PASSWORD manquant}"
+          : "${PROVISIONING_PROFILE:?secret PROVISIONING_PROFILE manquant}"
+          : "${TEAM_ID:?secret TEAM_ID manquant}"
+          : "${PROFILE_NAME:?secret PROFILE_NAME manquant}"
+
+      - name: Import signing assets
+        if: ${{ github.event.inputs.signed == 'true' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PASSWORD="ci-$(uuidgen)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROVISIONING_PROFILE" | base64 --decode \
+            > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Archive (signed)
+        if: ${{ github.event.inputs.signed == 'true' }}
+        env:
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/NovaNote.xcarchive \
+            IPHONEOS_DEPLOYMENT_TARGET="${{ steps.target.outputs.value }}" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            archive
+
+      - name: Export signed IPA
+        if: ${{ github.event.inputs.signed == 'true' }}
+        env:
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          set -euo pipefail
+          /usr/bin/sed -i '' "s/__TEAM_ID__/$TEAM_ID/g" ExportOptions.plist
+          xcodebuild -exportArchive \
+            -archivePath build/NovaNote.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/export
+          cp build/export/*.ipa NovaNote-signed.ipa
+          ls -lh NovaNote-signed.ipa
+
+      # ---------------------------------------------------------------
+      # Publication de l'artefact
+      # ---------------------------------------------------------------
+      - name: Upload signed IPA
+        if: ${{ github.event.inputs.signed == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NovaNote-signed-ipa
+          path: NovaNote-signed.ipa
+          if-no-files-found: error
+
+      - name: Upload unsigned IPA
+        if: ${{ github.event.inputs.signed != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NovaNote-unsigned-ipa
+          path: NovaNote-unsigned.ipa
+          if-no-files-found: error
